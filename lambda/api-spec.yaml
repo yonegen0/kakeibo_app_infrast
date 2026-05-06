@@ -1,0 +1,554 @@
+openapi: 3.0.3
+info:
+  title: Kakeibo App API
+  version: 1.0.0
+  description: |
+    家計簿アプリのフロントエンドフック実装をもとに整理した API 仕様。
+    Next.js Route Handler (`/api/*`) の実装に準拠する。
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: PSV
+    description: 取引データの保存・取得
+  - name: Summary
+    description: 取引サマリー生成・取得
+  - name: Analysis
+    description: AI 分析実行・プロンプト取得
+  - name: Report
+    description: AI レポート取得・一覧
+
+paths:
+  /api/psv:
+    post:
+      tags: [PSV]
+      summary: 取引一覧を PSV として保存
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePsvRequest'
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatePsvResponse'
+        '400':
+          description: リクエスト不正（transactions が空など）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: サーバー内部エラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/psv/latest:
+    get:
+      tags: [PSV]
+      summary: 最新 PSV を取得
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLatestPsvResponse'
+        '404':
+          description: PSV が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/psv/{psvId}:
+    get:
+      tags: [PSV]
+      summary: PSV データを取得
+      parameters:
+        - $ref: '#/components/parameters/PsvId'
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPsvResponse'
+        '404':
+          description: 指定 PSV が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/summary/{psvId}:
+    get:
+      tags: [Summary]
+      summary: 既存サマリーを取得
+      parameters:
+        - $ref: '#/components/parameters/PsvId'
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryResponse'
+        '404':
+          description: PSV またはサマリーが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Summary]
+      summary: PSV からサマリーを生成して保存
+      parameters:
+        - $ref: '#/components/parameters/PsvId'
+      responses:
+        '200':
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryResponse'
+        '404':
+          description: 指定 PSV が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: サマリー生成失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analyze/{psvId}:
+    get:
+      tags: [Analysis]
+      summary: 分析用デフォルトプロンプトを取得
+      parameters:
+        - $ref: '#/components/parameters/PsvId'
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzePromptResponse'
+        '404':
+          description: 指定 PSV が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: サマリー生成失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Analysis]
+      summary: PSV を AI 分析しレポートを生成
+      parameters:
+        - $ref: '#/components/parameters/PsvId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+      responses:
+        '200':
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '404':
+          description: 指定 PSV が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: サマリー生成失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/report/{reportId}:
+    get:
+      tags: [Report]
+      summary: レポート ID からレポート詳細を取得
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '404':
+          description: 指定レポートが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/reports:
+    get:
+      tags: [Report]
+      summary: レポート一覧を取得
+      parameters:
+        - name: psvId
+          in: query
+          required: false
+          description: 指定時は対象 PSV のレポートのみに絞り込む
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportsResponse'
+
+components:
+  parameters:
+    PsvId:
+      name: psvId
+      in: path
+      required: true
+      schema:
+        type: string
+    ReportId:
+      name: reportId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    CreatePsvRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: 省略時は demo-user
+        fileName:
+          type: string
+          description: 省略時は uploaded.csv
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionModel'
+      required: [transactions]
+
+    CreatePsvResponse:
+      type: object
+      required: [psvId, meta]
+      properties:
+        psvId:
+          type: string
+        meta:
+          $ref: '#/components/schemas/PsvMetaModel'
+
+    GetPsvResponse:
+      type: object
+      required: [psvId, meta, transactions, summary]
+      properties:
+        psvId:
+          type: string
+        meta:
+          $ref: '#/components/schemas/PsvMetaModel'
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionModel'
+        summary:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/SummaryModel'
+
+    GetLatestPsvResponse:
+      type: object
+      required: [psvId, meta]
+      properties:
+        psvId:
+          type: string
+        meta:
+          $ref: '#/components/schemas/PsvMetaModel'
+
+    AnalyzeRequest:
+      type: object
+      properties:
+        promptOverride:
+          type: string
+          description: 空白のみの場合は未指定扱い
+
+    AnalyzePromptResponse:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+
+    SummaryResponse:
+      type: object
+      required: [summary]
+      properties:
+        summary:
+          $ref: '#/components/schemas/SummaryModel'
+
+    ReportResponse:
+      type: object
+      required: [report]
+      properties:
+        report:
+          $ref: '#/components/schemas/AIReportModel'
+
+    ReportsResponse:
+      type: object
+      required: [reports]
+      properties:
+        reports:
+          type: array
+          items:
+            $ref: '#/components/schemas/AIReportModel'
+
+    AIReportModel:
+      type: object
+      required:
+        - reportId
+        - psvId
+        - title
+        - summary
+        - highlights
+        - promptSnapshot
+        - reportMarkdown
+        - createdAt
+      properties:
+        reportId:
+          type: string
+        psvId:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        highlights:
+          type: array
+          items:
+            type: string
+        promptSnapshot:
+          type: string
+        reportMarkdown:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TransactionModel:
+      type: object
+      required:
+        - id
+        - date
+        - amount
+        - content
+        - category
+        - subCategory
+        - isFixedCost
+        - memo
+        - source
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+        amount:
+          $ref: '#/components/schemas/Amount'
+        content:
+          type: string
+        category:
+          type: string
+        subCategory:
+          type: string
+        isCalculated:
+          type: boolean
+        isTransfer:
+          type: boolean
+        isFixedCost:
+          type: boolean
+        memo:
+          type: string
+        source:
+          type: string
+          enum: [moneyforward]
+
+    Amount:
+      type: object
+      required: [value, unit]
+      properties:
+        value:
+          type: number
+        unit:
+          type: string
+
+    PsvMetaModel:
+      type: object
+      required:
+        - psvId
+        - userId
+        - fileName
+        - rowCount
+        - monthRange
+        - createdAt
+        - updatedAt
+        - isLatest
+      properties:
+        psvId:
+          type: string
+        userId:
+          type: string
+        fileName:
+          type: string
+        rowCount:
+          type: integer
+        monthRange:
+          $ref: '#/components/schemas/MonthRange'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isLatest:
+          type: boolean
+
+    MonthRange:
+      type: object
+      required: [from, to]
+      properties:
+        from:
+          type: string
+          example: '2026-01'
+        to:
+          type: string
+          example: '2026-03'
+
+    SummaryModel:
+      type: object
+      required:
+        - month
+        - incomeTotal
+        - expenseTotal
+        - balance
+        - categories
+        - dailyTrend
+        - topExpenses
+        - fixedCosts
+      properties:
+        month:
+          type: string
+          example: '2026-03'
+        incomeTotal:
+          type: number
+        expenseTotal:
+          type: number
+        balance:
+          type: number
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/SummaryCategory'
+        dailyTrend:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyTrend'
+        topExpenses:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopExpense'
+        fixedCosts:
+          type: array
+          items:
+            $ref: '#/components/schemas/FixedCostItem'
+
+    SummaryCategory:
+      type: object
+      required: [name, amount, percentage, kind]
+      properties:
+        name:
+          type: string
+        amount:
+          type: number
+        percentage:
+          type: number
+        kind:
+          type: string
+          enum: [income, expense]
+
+    DailyTrend:
+      type: object
+      required: [date, income, expense, balance]
+      properties:
+        date:
+          type: string
+          format: date
+        income:
+          type: number
+        expense:
+          type: number
+        balance:
+          type: number
+
+    TopExpense:
+      type: object
+      required: [id, content, amount, category, date]
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        amount:
+          type: number
+        category:
+          type: string
+        date:
+          type: string
+          format: date
+
+    FixedCostItem:
+      type: object
+      required: [id, content, amount, category]
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        amount:
+          type: number
+        category:
+          type: string
