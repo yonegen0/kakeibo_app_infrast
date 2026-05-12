@@ -6,7 +6,7 @@
 環境変数:
     ENV: 実行環境（dev / prod）
     TABLE_ANALYZE: kakeibo-analyze-{env}
-    TABLE_PSV: kakeibo-psv-{env}（設計ギャップ: 追加が必要）
+    TABLE_PSV: kakeibo-psv-{env}
     TABLE_SUMMARY: kakeibo-summary-{env}（設計ギャップ: 追加が必要）
 """
 from __future__ import annotations
