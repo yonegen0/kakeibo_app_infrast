@@ -6,54 +6,17 @@
 環境変数:
     ENV: 実行環境（dev / prod）
     TABLE_PSV: kakeibo-psv-{env}
-    TABLE_SUMMARY: kakeibo-summary-{env}（設計ギャップ: 追加が必要）
+    TABLE_SUMMARY: kakeibo-summary-{env}
 """
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
-from shared.models.summary import SummaryModel
 from shared.utils import response
+from shared.utils.summary_serializer import serialize_summary
 from psv_get import logic
 
 _logger = logging.getLogger(__name__)
-
-
-def _serialize_summary(summary: Optional[SummaryModel]) -> Optional[dict[str, object]]:
-    """
-    SummaryModel を dict に変換する。
-
-    Args:
-        summary: 月次サマリー。None の場合は None を返す。
-
-    Returns:
-        シリアライズ済み dict。summary が None の場合は None
-    """
-    if summary is None:
-        return None
-    return {
-        "month": summary.month,
-        "incomeTotal": summary.incomeTotal,
-        "expenseTotal": summary.expenseTotal,
-        "balance": summary.balance,
-        "categories": [
-            {"name": c.name, "amount": c.amount, "percentage": c.percentage, "kind": c.kind.value}
-            for c in summary.categories
-        ],
-        "dailyTrend": [
-            {"date": t.date, "income": t.income, "expense": t.expense, "balance": t.balance}
-            for t in summary.dailyTrend
-        ],
-        "topExpenses": [
-            {"id": e.id, "content": e.content, "amount": e.amount, "category": e.category, "date": e.date}
-            for e in summary.topExpenses
-        ],
-        "fixedCosts": [
-            {"id": f.id, "content": f.content, "amount": f.amount, "category": f.category}
-            for f in summary.fixedCosts
-        ],
-    }
 
 
 def handler(event: dict[str, object], _context: object) -> dict[str, object]:
@@ -115,5 +78,5 @@ def handler(event: dict[str, object], _context: object) -> dict[str, object]:
             }
             for tx in psv_data.transactions
         ],
-        "summary": _serialize_summary(summary),
+        "summary": serialize_summary(summary) if summary is not None else None,
     })

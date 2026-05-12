@@ -20,10 +20,6 @@ def get_psv(psv_id: str) -> Optional[tuple[PsvFullData, Optional[SummaryModel]]]
 
     Returns:
         (PsvFullData, SummaryModel | None) のタプル。PSV が存在しない場合は None
-
-    Note:
-        インフラ設計書のギャップ: psv_get は TABLE_SUMMARY へのアクセスも必要。
-        env var TABLE_SUMMARY と dynamodb:PartiQLSelect 権限の追加が必要。
     """
     psv_data = dynamodb.get_psv_full(psv_id)
     if psv_data is None:
